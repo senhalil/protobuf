@@ -20,12 +20,23 @@ __author__ = 'jieluo@google.com (Jie Luo)'
 import calendar
 import collections.abc
 import datetime
+from re import compile
 from typing import Union
 import warnings
 from google.protobuf.internal import field_mask
 
 FieldMask = field_mask.FieldMask
 
+# The following mask represents the
+# full-date "T" time-hour ":" time-minute ":" time-second
+# part of the RFC 3339 ABNF.
+# Note that this mask:
+# - Matches the date and time elements in the YYYY-MM-DDTHH:MM:SS format.
+# - It does not match the timezone offset or the optional fractional seconds.
+# - It does not restrict the date and time elements into their valid ranges
+#   as it expects that the string will be further parsed by
+#   datetime.datetime.fromisoformat().
+_TIMESTAMP_SECOND_MASK = compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 _NANOS_PER_SECOND = 1000000000
 _NANOS_PER_MILLISECOND = 1000000
 _NANOS_PER_MICROSECOND = 1000
@@ -139,10 +150,11 @@ class Timestamp(object):
     else:
       second_value = time_value[:point_position]
       nano_value = time_value[point_position + 1 :]
-    if 't' in second_value:
+    if _TIMESTAMP_SECOND_MASK.fullmatch(second_value) is None:
       raise ValueError(
-          "time data '{0}' does not match format '%Y-%m-%dT%H:%M:%S', "
-          "lowercase 't' is not accepted".format(second_value)
+          "time data '{0}' does not match format '%Y-%m-%dT%H:%M:%S'".format(
+              second_value
+          )
       )
     date_object = datetime.datetime.fromisoformat(second_value)
     td = date_object - datetime.datetime(1970, 1, 1)
